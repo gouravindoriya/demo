@@ -193,7 +193,9 @@ function App() {
   }, [rates]);
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#191919_0%,#0f0f0f_50%,#060606_100%)] text-[#f6e6b8]">
+    <>
+   
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#191919_0%,#0f0f0f_50%,#060606_100%)] text-[#f6e6b8] ">
       <div className="border-b border-[#3c321e] bg-[#060606]">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-2 text-xs sm:text-sm">
           <p>ELIXIR GOLD | +91-9555573555 | inbox.elixir@gmail.com</p>
@@ -202,7 +204,7 @@ function App() {
       </div>
 
       <header className="mx-auto max-w-7xl px-4 pb-4 pt-8">
-        <div className="grid gap-5 rounded-3xl border border-[#45391e] bg-[linear-gradient(135deg,#1b1b1b_0%,#101010_60%,#090909_100%)] p-6 shadow-[0_24px_70px_rgba(0,0,0,0.55)] sm:p-10 lg:grid-cols-[1.7fr_1fr]">
+        <div className="grid gap-2 rounded-3xl border border-[#45391e] bg-[linear-gradient(135deg,#1b1b1b_0%,#101010_60%,#090909_100%)] p-6 shadow-[0_24px_70px_rgba(0,0,0,0.55)] sm:p-10 lg:grid-cols-[1.3fr_1fr]">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#e5c479]">
               ElixirGold.in Legacy Integrated
@@ -210,49 +212,51 @@ function App() {
             <h1 className="mt-2 font-display text-4xl font-semibold leading-tight text-[#f7e6b0] sm:text-5xl">
               ELIXIR GOLD LIVE DESK
             </h1>
-            <p className="mt-3 max-w-3xl text-sm text-[#d6c08a] sm:text-base">
+            {/* <p className="mt-3 max-w-3xl text-sm text-[#d6c08a] sm:text-base">
               Premium black theme dashboard for jewellers with live Buy/Sell/High/Low updates and
               old Elixir branch details integrated in one modern interface.
-            </p>
-
-           
+            </p> */}
 
            
           </div>
 
           
-           <div className="mt-4 grid gap-2 rounded-2xl border border-[#40351e] bg-[#0b0b0b] p-3 text-xs text-[#dac48f] sm:grid-cols-2">
+           <div className="mt-0 grid gap-4 rounded-2xl border border-[#40351e] bg-[#0b0b0b] p-3 text-sm text-[#dac48f] sm:grid-cols-2">
 
-             <div className="mt-5 rounded-2xl border border-[#4c4026] bg-[#0e0e0e] px-4 py-3 text-sm text-[#f0d58d] col-span-2 ">
+             <div className="mt-0 rounded-2xl border border-[#4c4026] bg-[#0e0e0e] px-4 mx-0 py-3 text-sm text-[#f0d58d] col-span-2  ">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p>
-                  Status: <span className="font-semibold">{status}</span>
+                  Last updated at  
+                  {/* <span className="font-semibold">{status}</span> */}
                 </p>
                 <p>
                   Last Updated: {lastUpdated ? lastUpdated.toLocaleTimeString("en-IN") : "Waiting..."}
                 </p>
               </div>
               {error && <p className="mt-2 text-red-400">Error: {error}</p>}
-            </div>
-              <p>Legacy Gold MCX: $ {legacyBhav.goldMcx}</p>
-              <p>Legacy Gold Gwalior: ₹ {legacyBhav.goldGwalior} + ₹5000</p>
-              <p>Legacy Silver MCX: $ {legacyBhav.silverMcx}</p>
-              <p>Legacy Silver Gwalior: ₹ {legacyBhav.silverGwalior} ₹5000</p>
+            </div >
+            
+
+            {/* </div> */}
+              <p>Gold MCX: $ {legacyBhav.goldMcx}</p>
+              <p>Gold Gwalior Bhav: ₹ {legacyBhav.goldGwalior}</p>
+              <p>Silver MCX: $ {legacyBhav.silverMcx}</p>
+              <p>Silver Gwalior Bhav: ₹ {legacyBhav.silverGwalior}</p>
             </div>
 
          
         </div>
       </header>
 
-      <section className="mx-auto max-w-7xl px-4 pb-4">
+      {/* <section className="mx-auto max-w-7xl px-4 pb-4">
         <div className="overflow-hidden rounded-xl border border-[#41351d] bg-[#0c0c0c] py-2">
           <div className="whitespace-nowrap px-4 text-sm font-medium text-[#e7c774]">
             ELIXIR LIVE RATES | GOLD COMEX | SILVER COMEX | INR EXCHANGE | FUTURES | PRODUCTS | JEWAR
           </div>
         </div>
-      </section>
+      </section> */}
 
-      <section className="mx-auto grid max-w-7xl gap-4 px-4 pb-6 md:grid-cols-3">
+      {/* <section className="mx-auto grid max-w-7xl gap-4 px-4 pb-6 md:grid-cols-3">
         {highlightCards.map((card) => (
           <article
             key={card.title}
@@ -260,17 +264,14 @@ function App() {
           >
             <h2 className="font-display text-2xl text-[#f4db99]">{card.title}</h2>
             <p className="mt-3 text-3xl font-semibold text-[#fff1c8]">
-              {card.row ? `${formatValue(card.row.buy)} ${card.unit}` : "Waiting..."}
+              {card.row ? `${formatValue(card.row.sell)} ${card.unit}` : "Waiting..."}
             </p>
-            <p className="mt-2 text-xs text-[#c9ad72]">
-              B: {card.row ? formatValue(card.row.buy) : "-"} | S: {card.row ? formatValue(card.row.sell) : "-"}
-            </p>
-            <p className="mt-1 text-sm text-[#ccb175]">
+            <p className="mt-2 text-sm text-[#ccb175]">
               L: {card.row ? formatValue(card.row.low) : "-"} | H: {card.row ? formatValue(card.row.high) : "-"}
             </p>
           </article>
         ))}
-      </section>
+      </section> */}
 
       <section className="mx-auto max-w-7xl px-4 pb-10">
         <div className="overflow-hidden rounded-3xl border border-[#4f4227] bg-[#0a0a0a] shadow-[0_20px_45px_rgba(0,0,0,0.55)]">
@@ -353,8 +354,12 @@ function App() {
           <p>Follow Us: Facebook</p>
           <p>© 2022 All Rights Reserved. ELIXIR GOLD</p>
         </div>
+
       </footer>
+
+      
     </main>
+     </>
   );
 }
 
