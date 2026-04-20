@@ -1,296 +1,361 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-const TOKEN = "goldapi-3q0jfsmo63uilk-io";
-const OUNCE_TO_GRAM = 31.1034768;
-const GRAMS_PER_TOLA = 11.6638038;
-const REFRESH_INTERVAL_MS = 60000;
-const COMPANY_NAME = "Elixir Gold Jewellers";
-const CONTACT_EMAIL = "inbox.elixir@gmail.com";
-const CONTACT_PHONE = "9555573555";
+const STREAM_URL =
+  "https://bcast.kanhajewellers.in:7768/VOTSBroadcastStreaming/Services/xml/GetLiveRateByTemplateID/kanha";
+const REFRESH_MS = 1000;
 
-const formatINR = (value) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
+const SERVICES = [
+  "Silver Assaying",
+  "Gold & Silver Melting",
+  "Spot Bullion Trading",
+  "Jewellery Calculator Support",
+];
+
+const BRANCHES = [
+  {
+    title: "ETAWAH BRANCH",
+    address:
+      "ELIXIR GOLD, 1ST FLOOR, RAMESHWARAM MARKET, SARAFA BAZAR, HOMEGANJ, ETAWAH (UP)",
+    email: "inbox.elixir@gmail.com",
+    phone: "9555573555",
+  },
+  {
+    title: "GWALIOR BRANCH",
+    address:
+      "Elixir Gold, Srinath Complex, Mor Gali, Sarafa, Lashkar, Gwalior, (MP) 474001",
+    email: "inbox.elixir@gmail.com",
+    phone: "9555573555",
+  },
+  {
+    title: "JHANSI BRANCH",
+    address: "JHANSI",
+    email: "inbox.elixir@gmail.com",
+    phone: "9555573555",
+  },
+];
+
+const toNumberOrNull = (value) => {
+  if (value === "-") {
+    return null;
+  }
+
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? null : parsed;
+};
+
+const formatValue = (value) => {
+  if (value === null) {
+    return "-";
+  }
+
+  return new Intl.NumberFormat("en-IN", {
+    minimumFractionDigits: value % 1 ? 2 : 0,
     maximumFractionDigits: 2,
   }).format(value);
+};
 
-const formatTimeIST = (date) =>
-  new Intl.DateTimeFormat("en-IN", {
-    dateStyle: "medium",
-    timeStyle: "short",
-    timeZone: "Asia/Kolkata",
-  }).format(date);
+const parseRates = (raw) => {
+  const normalized = raw.replace(/\r/g, " ").replace(/\n/g, " ").replace(/\s+/g, " ").trim();
+  const segments = normalized.split(/(?=\b\d{4}\s)/g);
 
-export default function MetalPrices() {
-  const [prices, setPrices] = useState({ gold: null, silver: null });
-  const [lastUpdated, setLastUpdated] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  return segments
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+    .map((segment) => {
+      const match = segment.match(
+        /^(\d{4})\s+(.+?)\s+(-|\d+(?:\.\d+)?)\s+(-|\d+(?:\.\d+)?)\s+(-|\d+(?:\.\d+)?)\s+(-|\d+(?:\.\d+)?)$/
+      );
+
+      if (!match) {
+        return null;
+      }
+
+      return {
+        id: match[1],
+        label: match[2],
+        buy: toNumberOrNull(match[3]),
+        sell: toNumberOrNull(match[4]),
+        high: toNumberOrNull(match[5]),
+        low: toNumberOrNull(match[6]),
+      };
+    })
+    .filter(Boolean);
+};
+
+function App() {
+  const [rates, setRates] = useState([]);
+  const [status, setStatus] = useState("Connecting...");
   const [error, setError] = useState("");
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   useEffect(() => {
-    const fetchMetal = async (symbol) => {
-      const response = await fetch(`https://www.goldapi.io/api/${symbol}/INR`, {
-        headers: {
-          "x-access-token": TOKEN,
-        },
-      });
+    let activeController = new AbortController();
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch ${symbol} (${response.status})`);
-      }
-
-      return response.json();
-    };
-
-    const fetchPrices = async () => {
+    const readStream = async (signal) => {
       try {
-        setIsLoading(true);
+        setStatus("Connecting...");
         setError("");
 
-        const [goldData, silverData] = await Promise.all([
-          fetchMetal("XAU"),
-          fetchMetal("XAG"),
-        ]);
+        const timestamp = Math.floor(Date.now() / 1000);
+        const response = await fetch(`${STREAM_URL}?_=${timestamp}`, { signal });
 
-        const goldPerOunce = Number(goldData.price);
-        const silverPerOunce = Number(silverData.price);
+        if (!response.ok) {
+          throw new Error(`Request failed with status ${response.status}`);
+        }
 
-        setPrices({
-          gold: {
-            perOunce: goldPerOunce,
-            perGram: goldPerOunce / OUNCE_TO_GRAM,
-            per10Gram: (goldPerOunce / OUNCE_TO_GRAM) * 10,
-            perTola: (goldPerOunce / OUNCE_TO_GRAM) * GRAMS_PER_TOLA,
-          },
-          silver: {
-            perOunce: silverPerOunce,
-            perGram: silverPerOunce / OUNCE_TO_GRAM,
-            per10Gram: (silverPerOunce / OUNCE_TO_GRAM) * 10,
-            perTola: (silverPerOunce / OUNCE_TO_GRAM) * GRAMS_PER_TOLA,
-          },
-        });
+        const applyData = (textChunk) => {
+          const parsedRows = parseRates(textChunk);
+          if (parsedRows.length) {
+            setRates(parsedRows);
+            setLastUpdated(new Date());
+            setStatus("Live rates updated");
+          }
+        };
 
-        setLastUpdated(
-          new Date((Number(goldData.timestamp) || Date.now() / 1000) * 1000)
-        );
-      } catch (fetchError) {
-        setError(fetchError.message || "India market rates could not be loaded.");
-      } finally {
-        setIsLoading(false);
+        if (!response.body) {
+          const textBody = await response.text();
+          console.log("Non-stream response", textBody);
+          applyData(textBody);
+          return;
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let combinedText = "";
+
+        setStatus("Streaming live rates...");
+
+        while (true) {
+          const { value, done } = await reader.read();
+
+          if (done) {
+            break;
+          }
+
+          const chunk = decoder.decode(value, { stream: true });
+          combinedText += chunk;
+          console.log("Stream chunk", chunk);
+          applyData(combinedText);
+        }
+      } catch (streamError) {
+        if (streamError.name !== "AbortError") {
+          console.error("Stream error", streamError);
+          setError(streamError.message || "Unable to fetch live rates");
+          setStatus("Connection error");
+        }
       }
     };
 
-    fetchPrices();
+    const start = () => {
+      readStream(activeController.signal);
+    };
 
-    const intervalId = setInterval(fetchPrices, REFRESH_INTERVAL_MS);
-    return () => clearInterval(intervalId);
+    start();
+
+    const intervalId = setInterval(() => {
+      activeController.abort();
+      activeController = new AbortController();
+      setStatus("Refreshing feed...");
+      start();
+    }, REFRESH_MS);
+
+    return () => {
+      clearInterval(intervalId);
+      activeController.abort();
+    };
   }, []);
 
-  const gold22kPer10g = prices.gold ? (prices.gold.per10Gram * 22) / 24 : null;
-  const branches = [
-    {
-      title: "ETAWAH BRANCH",
-      address:
-        "ELIXIR GOLD, 1ST FLOOR, RAMESHWARAM MARKET, SARAFA BAZAR, HOMEGANJ, ETAWAH (UP)",
-    },
-    {
-      title: "GWALIOR BRANCH",
-      address:
-        "Elixir Gold, Srinath Complex, Mor Gali, Sarafa, Lashkar, Gwalior, (MP) 474001",
-    },
-    {
-      title: "JHANSI BRANCH",
-      address: "JHANSI",
-    },
-  ];
+  const highlightCards = useMemo(() => {
+    const findByLabel = (term) => rates.find((item) => item.label.includes(term));
+
+    return [
+      { title: "Gold Comex", row: findByLabel("GOLD COMEX"), unit: "$" },
+      { title: "Silver Comex", row: findByLabel("SILVER COMEX"), unit: "$" },
+      { title: "INR Exchange", row: findByLabel("INR EX"), unit: "INR" },
+    ];
+  }, [rates]);
+
+  const legacyBhav = useMemo(() => {
+    const findByLabel = (term) => rates.find((item) => item.label.includes(term));
+
+    const goldComex = findByLabel("GOLD COMEX");
+    const silverComex = findByLabel("SILVER COMEX");
+    const goldGwalior = findByLabel("GOLD 99.50-10 GM") || findByLabel("GOLD JEWAR 22 CT");
+    const silverGwalior =
+      findByLabel("SILVER CUT 9999-1 KG") || findByLabel("SWASTIK SILVER-1 KG");
+
+    return {
+      goldMcx: goldComex ? formatValue(goldComex.sell) : "-",
+      goldGwalior: goldGwalior ? formatValue(goldGwalior.sell) : "-",
+      silverMcx: silverComex ? formatValue(silverComex.sell) : "-",
+      silverGwalior: silverGwalior ? formatValue(silverGwalior.sell) : "-",
+    };
+  }, [rates]);
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_0%_0%,#fff8e4_0%,#f8f1df_32%,#f2eee9_62%,#e8edf4_100%)] px-4 py-8 sm:px-6 lg:px-10">
-      <section className="mx-auto w-full max-w-6xl overflow-hidden rounded-[28px] border border-[#d7c7a0]/70 bg-white/90 shadow-[0_30px_80px_rgba(78,62,32,0.18)] backdrop-blur">
-        <header className="border-b border-[#e8dbc0] bg-[linear-gradient(115deg,#f7e8c4_0%,#f8efd8_38%,#f5ead2_70%,#e9dfc6_100%)] px-6 py-8 sm:px-10">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="font-body text-[11px] font-semibold uppercase tracking-[0.28em] text-[#836328]">
-              Hallmarked Jewellery Company
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#191919_0%,#0f0f0f_50%,#060606_100%)] text-[#f6e6b8]">
+      <div className="border-b border-[#3c321e] bg-[#060606]">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-2 text-xs sm:text-sm">
+          <p>ELIXIR GOLD | +91-9555573555 | inbox.elixir@gmail.com</p>
+          <p>Working Hours: 11:00 AM - 8:00 PM</p>
+        </div>
+      </div>
+
+      <header className="mx-auto max-w-7xl px-4 pb-4 pt-8">
+        <div className="grid gap-5 rounded-3xl border border-[#45391e] bg-[linear-gradient(135deg,#1b1b1b_0%,#101010_60%,#090909_100%)] p-6 shadow-[0_24px_70px_rgba(0,0,0,0.55)] sm:p-10 lg:grid-cols-[1.7fr_1fr]">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#e5c479]">
+              ElixirGold.in Legacy Integrated
             </p>
-            <p className="font-body rounded-full border border-[#cdb57d] bg-white/60 px-3 py-1 text-xs text-[#6a4f1e]">
-              Since 2009
+            <h1 className="mt-2 font-display text-4xl font-semibold leading-tight text-[#f7e6b0] sm:text-5xl">
+              ELIXIR GOLD LIVE DESK
+            </h1>
+            <p className="mt-3 max-w-3xl text-sm text-[#d6c08a] sm:text-base">
+              Premium black theme dashboard for jewellers with live Buy/Sell/High/Low updates and
+              old Elixir branch details integrated in one modern interface.
             </p>
+
+           
+
+           
           </div>
 
-          <h1 className="font-display mt-3 text-4xl leading-tight text-[#3b2a13] sm:text-5xl lg:text-6xl">
-            {COMPANY_NAME}
-          </h1>
+          
+           <div className="mt-4 grid gap-2 rounded-2xl border border-[#40351e] bg-[#0b0b0b] p-3 text-xs text-[#dac48f] sm:grid-cols-2">
 
-          <p className="font-body mt-3 max-w-3xl text-sm leading-relaxed text-[#5f4b22] sm:text-base">
-            Premium gold and silver jewellery with transparent daily pricing for retail clients,
-            bridal orders, and wholesale showroom billing.
-          </p>
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            <span className="font-body rounded-full border border-[#d8c089] bg-white/70 px-3 py-1 text-xs font-medium text-[#5f4b22]">
-              BIS Hallmarked
-            </span>
-            <span className="font-body rounded-full border border-[#d8c089] bg-white/70 px-3 py-1 text-xs font-medium text-[#5f4b22]">
-              Transparent Billing
-            </span>
-            <span className="font-body rounded-full border border-[#d8c089] bg-white/70 px-3 py-1 text-xs font-medium text-[#5f4b22]">
-              Live India Bullion Rates
-            </span>
-          </div>
-        </header>
-
-        <div className="grid gap-6 px-6 py-6 sm:px-10 sm:py-8 lg:grid-cols-[1.25fr_2fr] lg:gap-8">
-          <aside className="rounded-2xl border border-[#eadfc7] bg-[#fbf8f2] p-5">
-            <h2 className="font-display text-3xl text-[#3f2f16]">Company Profile</h2>
-            <p className="font-body mt-3 text-sm leading-relaxed text-[#62502a]">
-              We craft contemporary and traditional jewellery collections with certified purity and
-              responsible sourcing. This dashboard is used by our sales team for real-time customer
-              quotation.
-            </p>
-
-            <div className="mt-5 space-y-2">
-              <p className="font-body text-sm text-[#4f4121]">
-                <span className="font-semibold">Business:</span> Gold, Silver, Bridal & Custom Design
-              </p>
-              <p className="font-body text-sm text-[#4f4121]">
-                <span className="font-semibold">Segment:</span> Retail Showroom + Wholesale Supply
-              </p>
-              <p className="font-body text-sm text-[#4f4121]">
-                <span className="font-semibold">Market:</span> India (INR)
-              </p>
-            </div>
-
-            <p className="font-body mt-5 rounded-xl border border-[#e6d6b5] bg-white px-3 py-2 text-xs text-[#725e31]">
-              Note: Final invoice may include GST, wastage, and making charges as per design.
-            </p>
-          </aside>
-
-          <section>
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#e5d6b8] bg-[#faf6ed] px-4 py-3">
-              <p className="font-body text-sm font-medium text-[#5f512f]">
-                Currency: INR | Source: GoldAPI | Auto refresh: 60 sec
-              </p>
-              <p className="font-body text-sm text-[#786746]">
-                {lastUpdated
-                  ? `Updated: ${formatTimeIST(lastUpdated)} IST`
-                  : "Waiting for market timestamp..."}
-              </p>
-            </div>
-
-            {isLoading && (
-              <div className="rounded-2xl border border-[#eadfca] bg-white p-8 text-center">
-                <p className="font-body text-base text-[#6a5b37]">
-                  Fetching latest India bullion rates...
+             <div className="mt-5 rounded-2xl border border-[#4c4026] bg-[#0e0e0e] px-4 py-3 text-sm text-[#f0d58d] col-span-2 ">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p>
+                  Status: <span className="font-semibold">{status}</span>
+                </p>
+                <p>
+                  Last Updated: {lastUpdated ? lastUpdated.toLocaleTimeString("en-IN") : "Waiting..."}
                 </p>
               </div>
-            )}
+              {error && <p className="mt-2 text-red-400">Error: {error}</p>}
+            </div>
+              <p>Legacy Gold MCX: $ {legacyBhav.goldMcx}</p>
+              <p>Legacy Gold Gwalior: ₹ {legacyBhav.goldGwalior} + ₹5000</p>
+              <p>Legacy Silver MCX: $ {legacyBhav.silverMcx}</p>
+              <p>Legacy Silver Gwalior: ₹ {legacyBhav.silverGwalior} ₹5000</p>
+            </div>
 
-            {error && (
-              <div className="rounded-2xl border border-red-200 bg-red-50 p-5">
-                <p className="font-body text-sm font-semibold text-red-700">Unable to load prices</p>
-                <p className="font-body mt-1 text-sm text-red-600">{error}</p>
-              </div>
-            )}
+         
+        </div>
+      </header>
 
-            {!isLoading && !error && (
-              <div className="grid gap-5 md:grid-cols-2">
-                <article className="rounded-2xl border border-[#e5c97a] bg-[linear-gradient(165deg,#fff6dc_0%,#ffefbf_100%)] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                  <h3 className="font-display text-3xl text-[#4b390f]">Gold</h3>
-                  <p className="font-body mt-1 text-sm uppercase tracking-wide text-[#7d5e1b]">
-                    XAU / INR
-                  </p>
-                  <div className="mt-5 space-y-3">
-                    <p className="font-body text-[#4b390f]">
-                      <span className="mr-2 text-sm text-[#7d5e1b]">24K per 10g</span>
-                      <span className="text-2xl font-semibold">{formatINR(prices.gold.per10Gram)}</span>
-                    </p>
-                    <p className="font-body text-[#4b390f]">
-                      <span className="mr-2 text-sm text-[#7d5e1b]">22K per 10g (est.)</span>
-                      <span className="text-lg font-semibold">{formatINR(gold22kPer10g)}</span>
-                    </p>
-                    <p className="font-body text-[#4b390f]">
-                      <span className="mr-2 text-sm text-[#7d5e1b]">Per gram</span>
-                      <span className="text-lg font-semibold">{formatINR(prices.gold.perGram)}</span>
-                    </p>
-                    <p className="font-body text-[#4b390f]">
-                      <span className="mr-2 text-sm text-[#7d5e1b]">Per tola</span>
-                      <span className="text-lg font-semibold">{formatINR(prices.gold.perTola)}</span>
-                    </p>
-                  </div>
-                </article>
-
-                <article className="rounded-2xl border border-[#d6dde7] bg-[linear-gradient(165deg,#f7fafc_0%,#e8eef6_100%)] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
-                  <h3 className="font-display text-3xl text-[#243246]">Silver</h3>
-                  <p className="font-body mt-1 text-sm uppercase tracking-wide text-[#5a6d85]">
-                    XAG / INR
-                  </p>
-                  <div className="mt-5 space-y-3">
-                    <p className="font-body text-[#243246]">
-                      <span className="mr-2 text-sm text-[#5a6d85]">Per kg</span>
-                      <span className="text-2xl font-semibold">
-                        {formatINR(prices.silver.perGram * 1000)}
-                      </span>
-                    </p>
-                    <p className="font-body text-[#243246]">
-                      <span className="mr-2 text-sm text-[#5a6d85]">Per 10g</span>
-                      <span className="text-lg font-semibold">{formatINR(prices.silver.per10Gram)}</span>
-                    </p>
-                    <p className="font-body text-[#243246]">
-                      <span className="mr-2 text-sm text-[#5a6d85]">Per gram</span>
-                      <span className="text-lg font-semibold">{formatINR(prices.silver.perGram)}</span>
-                    </p>
-                  </div>
-                </article>
-              </div>
-            )}
-          </section>
+      <section className="mx-auto max-w-7xl px-4 pb-4">
+        <div className="overflow-hidden rounded-xl border border-[#41351d] bg-[#0c0c0c] py-2">
+          <div className="whitespace-nowrap px-4 text-sm font-medium text-[#e7c774]">
+            ELIXIR LIVE RATES | GOLD COMEX | SILVER COMEX | INR EXCHANGE | FUTURES | PRODUCTS | JEWAR
+          </div>
         </div>
       </section>
 
-      {/* <footer className="mx-auto mt-6 w-full max-w-6xl overflow-hidden rounded-[28px] border border-[#d7c7a0]/70 bg-[linear-gradient(110deg,#fbf4e6_0%,#f5ecd9_45%,#efe5d0_100%)] px-6 py-7 shadow-[0_22px_48px_rgba(79,60,29,0.12)] sm:px-10">
-        <div className="grid gap-5 md:grid-cols-3">
-          {branches.map((branch) => (
-            <article
-              key={branch.title}
-              className="rounded-2xl border border-[#e2d2ab] bg-white/70 p-4 shadow-[0_8px_20px_rgba(87,70,38,0.08)]"
-            >
-              <h3 className="font-body text-xs font-bold uppercase tracking-[0.18em] text-[#7b5d28]">
+      <section className="mx-auto grid max-w-7xl gap-4 px-4 pb-6 md:grid-cols-3">
+        {highlightCards.map((card) => (
+          <article
+            key={card.title}
+            className="rounded-2xl border border-[#4d4024] bg-[linear-gradient(130deg,#181818_0%,#0c0c0c_100%)] p-5 shadow-[0_16px_28px_rgba(0,0,0,0.45)]"
+          >
+            <h2 className="font-display text-2xl text-[#f4db99]">{card.title}</h2>
+            <p className="mt-3 text-3xl font-semibold text-[#fff1c8]">
+              {card.row ? `${formatValue(card.row.buy)} ${card.unit}` : "Waiting..."}
+            </p>
+            <p className="mt-2 text-xs text-[#c9ad72]">
+              B: {card.row ? formatValue(card.row.buy) : "-"} | S: {card.row ? formatValue(card.row.sell) : "-"}
+            </p>
+            <p className="mt-1 text-sm text-[#ccb175]">
+              L: {card.row ? formatValue(card.row.low) : "-"} | H: {card.row ? formatValue(card.row.high) : "-"}
+            </p>
+          </article>
+        ))}
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 pb-10">
+        <div className="overflow-hidden rounded-3xl border border-[#4f4227] bg-[#0a0a0a] shadow-[0_20px_45px_rgba(0,0,0,0.55)]">
+          <div className="border-b border-[#463a22] bg-[#111] px-5 py-4">
+            <h3 className="font-display text-3xl text-[#f2d792]">Market Board</h3>
+            <p className="mt-1 text-sm text-[#c8ab6b]">Live rates from old feed integrated in new Elixir black theme</p>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm">
+              <thead className="bg-[#1d1710] text-[#f8e7bb]">
+                <tr>
+                  <th className="px-4 py-3 font-medium">Instrument</th>
+                  <th className="px-4 py-3 font-medium">Buy</th>
+                  <th className="px-4 py-3 font-medium">Sell</th>
+                  <th className="px-4 py-3 font-medium">High</th>
+                  <th className="px-4 py-3 font-medium">Low</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rates.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="px-4 py-6 text-center text-[#bea15f]">
+                      Waiting for stream data...
+                    </td>
+                  </tr>
+                )}
+
+                {rates.map((row, index) => (
+                  <tr
+                    key={row.id}
+                    className={index % 2 === 0 ? "bg-[#0f0f0f] text-[#f0d59a]" : "bg-[#151515] text-[#e4c887]"}
+                  >
+                    <td className="px-4 py-3 font-medium">{row.label}</td>
+                    <td className="px-4 py-3">{formatValue(row.buy)}</td>
+                    <td className="px-4 py-3">{formatValue(row.sell)}</td>
+                    <td className="px-4 py-3">{formatValue(row.high)}</td>
+                    <td className="px-4 py-3">{formatValue(row.low)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 pb-8">
+        <div className="rounded-3xl border border-[#44391f] bg-[#0b0b0b] p-5 sm:p-7">
+          <h3 className="font-display text-3xl text-[#f0d38f]">Our Services</h3>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {SERVICES.map((item) => (
+              <div key={item} className="rounded-xl border border-[#534528] bg-[#121212] px-4 py-3 text-sm text-[#e2c27f]">
+                {item}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <footer className="mx-auto mb-8 max-w-7xl rounded-3xl border border-[#44391f] bg-[#090909] px-4 py-6 sm:px-6">
+        <h3 className="font-display text-3xl text-[#f2d58f]">Branches</h3>
+        <div className="mt-4 grid gap-4 md:grid-cols-3">
+          {BRANCHES.map((branch) => (
+            <article key={branch.title} className="rounded-2xl border border-[#504327] bg-[#111] p-4 text-[#dec080]">
+              <h4 className="text-xs font-semibold uppercase tracking-[0.16em] text-[#f3d995]">
                 {branch.title}
-              </h3>
-              <p className="font-body mt-3 text-sm leading-relaxed text-[#4f3f1e]">{branch.address}</p>
-              <a
-                href={`mailto:${CONTACT_EMAIL}`}
-                className="font-body mt-3 block text-sm font-medium text-[#5c4312] underline decoration-[#c3a05a] underline-offset-2 hover:text-[#3f2c08]"
-              >
-                {CONTACT_EMAIL}
+              </h4>
+              <p className="mt-2 text-sm leading-relaxed text-[#c5aa6e]">{branch.address}</p>
+              <a className="mt-3 block text-sm text-[#f1d590]" href={`mailto:${branch.email}`}>
+                {branch.email}
               </a>
-              <a
-                href={`tel:${CONTACT_PHONE}`}
-                className="font-body mt-1 block text-sm font-medium text-[#5c4312] hover:text-[#3f2c08]"
-              >
-                {CONTACT_PHONE}
+              <a className="mt-1 block text-sm text-[#f1d590]" href={`tel:${branch.phone}`}>
+                {branch.phone}
               </a>
             </article>
           ))}
         </div>
 
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[#decba0] pt-4">
-          <p className="font-body text-sm font-semibold text-[#60491c]">Follow Us</p>
-          <div className="flex flex-wrap gap-2">
-          
-            <a
-              href="https://www.facebook.com/"
-              target="_blank"
-              rel="noreferrer"
-              className="font-body rounded-full border border-[#d4b87c] bg-white/80 px-3 py-1 text-xs font-medium text-[#5d4514] hover:bg-[#fff4da]"
-            >
-              Facebook
-            </a>
-           
-          </div>
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-[#40351f] pt-4 text-sm text-[#d6ba7d]">
+          <p>Follow Us: Facebook</p>
+          <p>© 2022 All Rights Reserved. ELIXIR GOLD</p>
         </div>
-      </footer> */}
+      </footer>
     </main>
   );
 }
+
+export default App;
