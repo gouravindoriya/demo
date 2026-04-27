@@ -179,23 +179,51 @@ function App() {
     const findByLabel = (term) => rates.find((item) => item.label.includes(term));
 
     const goldComex = findByLabel("GOLD COMEX");
+    const goldJune = findByLabel("GOLD JUNE") || findByLabel("GOLD JUN");
     const silverComex = findByLabel("SILVER COMEX");
+    const silverMay = findByLabel("SILVER MAY");
     const goldGwalior = findByLabel("GOLD 99.50-10 GM") || findByLabel("GOLD JEWAR 22 CT");
     const silverGwalior =
       findByLabel("SILVER CUT 9999-1 KG") || findByLabel("SWASTIK SILVER-1 KG");
 
     return {
       goldMcx: goldComex ? formatValue(goldComex.sell) : "-",
+      goldJuneBuy: goldJune ? formatValue(goldJune.buy) : "-",
       goldGwalior: goldGwalior ? formatValue(goldGwalior.sell) : "-",
       silverMcx: silverComex ? formatValue(silverComex.sell) : "-",
+      silverMayBuy: silverMay ? formatValue(silverMay.buy) : "-",
       silverGwalior: silverGwalior ? formatValue(silverGwalior.sell) : "-",
     };
   }, [rates]);
 
+  const parseDisplayNumber = (value) => {
+    if (value === "-") {
+      return null;
+    }
+
+    const numericValue = Number(String(value).replace(/,/g, ""));
+    return Number.isFinite(numericValue) ? numericValue : null;
+  };
+
+  const formatOffsetValue = (value, offset) => {
+    const numericValue = parseDisplayNumber(value);
+    return numericValue === null ? "-" : `₹ ${numericValue + offset}`;
+  };
+
+  const adminRateCards = [
+    { title: "Gold MCX", value: `$ ${legacyBhav.goldMcx}` },
+    { title: "Silver MCX", value: `$ ${legacyBhav.silverMcx}` },
+    { title: "Indian Gold", value: `₹ ${legacyBhav.goldJuneBuy}` },
+    { title: "Indian Silver", value: `₹ ${legacyBhav.silverMayBuy}` },
+  ];
+
+  const gwaliorGold = formatOffsetValue(legacyBhav.goldJuneBuy, 1000);
+  const gwaliorSilver = formatOffsetValue(legacyBhav.silverMayBuy, 1000);
+
   return (
     <>
    
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#191919_0%,#0f0f0f_50%,#060606_100%)] text-[#f6e6b8] ">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#191919_0%,#0f0f0f_50%,#060606_100%)] text-[#f6e6b8] pb-10">
       <div className="border-b border-[#3c321e] bg-[#060606]">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-2 text-xs sm:text-sm">
           <p>ELIXIR GOLD | +91-9555573555 | inbox.elixir@gmail.com</p>
@@ -204,11 +232,9 @@ function App() {
       </div>
 
       <header className="mx-auto max-w-7xl px-4 pb-4 pt-8">
-        <div className="grid gap-2 rounded-3xl border border-[#45391e] bg-[linear-gradient(135deg,#1b1b1b_0%,#101010_60%,#090909_100%)] p-6 shadow-[0_24px_70px_rgba(0,0,0,0.55)] sm:p-10 lg:grid-cols-[1.3fr_1fr]">
+        <div className="rounded-3xl border border-[#45391e] bg-[linear-gradient(135deg,#1b1b1b_0%,#101010_60%,#090909_100%)] p-6 shadow-[0_24px_70px_rgba(0,0,0,0.55)] sm:p-10">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#e5c479]">
-              ElixirGold.in Legacy Integrated
-            </p>
+        
             <h1 className="mt-2 font-display text-4xl font-semibold leading-tight text-[#f7e6b0] sm:text-5xl">
               ELIXIR GOLD LIVE DESK
             </h1>
@@ -221,9 +247,9 @@ function App() {
           </div>
 
           
-           <div className="mt-0 grid gap-4 rounded-2xl border border-[#40351e] bg-[#0b0b0b] p-3 text-sm text-[#dac48f] sm:grid-cols-2">
+           <div className="mt-0 rounded-2xl border border-[#40351e] bg-[#0b0b0b] p-3 text-sm text-[#dac48f]">
 
-             <div className="mt-0 rounded-2xl border border-[#4c4026] bg-[#0e0e0e] px-4 mx-0 py-3 text-sm text-[#f0d58d] col-span-2  ">
+             <div className="mt-0 rounded-2xl border border-[#4c4026] bg-[#0e0e0e] px-4 mx-0 py-3 text-sm text-[#f0d58d]">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p>
                   Last updated at  
@@ -235,13 +261,26 @@ function App() {
               </div>
               {error && <p className="mt-2 text-red-400">Error: {error}</p>}
             </div >
-            
 
-            {/* </div> */}
-              <p>Gold MCX: $ {legacyBhav.goldMcx}</p>
-              <p>Gold Gwalior Bhav: ₹ {legacyBhav.goldGwalior}</p>
-              <p>Silver MCX: $ {legacyBhav.silverMcx}</p>
-              <p>Silver Gwalior Bhav: ₹ {legacyBhav.silverGwalior}</p>
+            <div className="mt-3 rounded-2xl border border-[#4a3d24] bg-[#0d0d0d] p-3">
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                {adminRateCards.map((card) => (
+                  <article key={card.title} className="rounded-xl border border-[#5a4a2b] bg-[linear-gradient(140deg,#171717_0%,#0f0f0f_100%)] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#c7a966]">{card.title}</p>
+                    <p className="mt-2 text-xl font-semibold text-[#f5d993] sm:text-2xl">{card.value}</p>
+                  </article>
+                ))}
+                <article className="rounded-xl border border-[#5a4a2b] bg-[linear-gradient(140deg,#171717_0%,#0f0f0f_100%)] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#c7a966]">Gwalior Gold</p>
+                  <p className="mt-2 text-xl font-semibold text-[#f5d993] sm:text-2xl">{gwaliorGold}</p>
+                </article>
+                <article className="rounded-xl border border-[#5a4a2b] bg-[linear-gradient(140deg,#171717_0%,#0f0f0f_100%)] px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#c7a966]">Gwalior Silver</p>
+                  <p className="mt-2 text-xl font-semibold text-[#f5d993] sm:text-2xl">{gwaliorSilver}</p>
+                </article>
+              </div>
+            </div>
             </div>
 
          
