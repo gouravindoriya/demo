@@ -1,4 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import {
+  parseRates,
+  toNumberOrNull,
+  findByLabel,
+  validateData,
+  getParserDiagnostics,
+} from "./services/dataParser";
 
 const STREAM_URL =
   "https://bcast.kanhajewellers.in:7768/VOTSBroadcastStreaming/Services/xml/GetLiveRateByTemplateID/kanha";
@@ -34,15 +41,6 @@ const BRANCHES = [
   },
 ];
 
-const toNumberOrNull = (value) => {
-  if (value === "-") {
-    return null;
-  }
-
-  const parsed = Number(value);
-  return Number.isNaN(parsed) ? null : parsed;
-};
-
 const formatValue = (value) => {
   if (value === null) {
     return "-";
@@ -54,39 +52,12 @@ const formatValue = (value) => {
   }).format(value);
 };
 
-const parseRates = (raw) => {
-  const normalized = raw.replace(/\r/g, " ").replace(/\n/g, " ").replace(/\s+/g, " ").trim();
-  const segments = normalized.split(/(?=\b\d{4}\s)/g);
-
-  return segments
-    .map((segment) => segment.trim())
-    .filter(Boolean)
-    .map((segment) => {
-      const match = segment.match(
-        /^(\d{4})\s+(.+?)\s+(-|\d+(?:\.\d+)?)\s+(-|\d+(?:\.\d+)?)\s+(-|\d+(?:\.\d+)?)\s+(-|\d+(?:\.\d+)?)$/
-      );
-
-      if (!match) {
-        return null;
-      }
-
-      return {
-        id: match[1],
-        label: match[2],
-        buy: toNumberOrNull(match[3]),
-        sell: toNumberOrNull(match[4]),
-        high: toNumberOrNull(match[5]),
-        low: toNumberOrNull(match[6]),
-      };
-    })
-    .filter(Boolean);
-};
-
 function App() {
   const [rates, setRates] = useState([]);
   const [status, setStatus] = useState("Connecting...");
   const [error, setError] = useState("");
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [diagnostics, setDiagnostics] = useState(null);
 
   useEffect(() => {
     let activeController = new AbortController();
@@ -104,11 +75,37 @@ function App() {
         }
 
         const applyData = (textChunk) => {
-          const parsedRows = parseRates(textChunk);
-          if (parsedRows.length) {
-            setRates(parsedRows);
-            setLastUpdated(new Date());
-            setStatus("Live rates updated");
+          try {
+            // Use robust parser with edge case handling
+            const parsedRows = parseRates(textChunk, {
+              minFields: 3,
+              maxFields: 6,
+              allowPartialData: true,
+              logWarnings: true,
+            });
+
+            // Validate parsed data
+            const validationIssues = validateData(parsedRows);
+            const diagnostics = getParserDiagnostics(
+              textChunk,
+              parsedRows,
+              validationIssues
+            );
+
+            if (parsedRows.length) {
+              setRates(parsedRows);
+              setLastUpdated(new Date());
+              setStatus("Live rates updated");
+              setDiagnostics(diagnostics);
+
+              // Log diagnostics in development
+              if (import.meta.env.DEV && diagnostics.issueCount > 0) {
+                console.info("[Diagnostics]", diagnostics);
+              }
+            }
+          } catch (parseError) {
+            console.error("[Parser Error]", parseError);
+            setError(`Parse error: ${parseError.message}`);
           }
         };
 
@@ -166,32 +163,27 @@ function App() {
   }, []);
 
   const highlightCards = useMemo(() => {
-    const findByLabel = (term) => rates.find((item) => item.label.includes(term));
-
     return [
-      { title: "Gold Comex", row: findByLabel("GOLD COMEX"), unit: "$" },
-      { title: "Silver Comex", row: findByLabel("SILVER COMEX"), unit: "$" },
-      { title: "INR Exchange", row: findByLabel("INR EX"), unit: "INR" },
+      { title: "Gold Comex", row: findByLabel(rates, 'goldComex'), unit: "$" },
+      { title: "Silver Comex", row: findByLabel(rates, 'silverComex'), unit: "$" },
+      { title: "INR Exchange", row: findByLabel(rates, 'inrExchange'), unit: "INR" },
     ];
   }, [rates]);
 
   const legacyBhav = useMemo(() => {
-    const findByLabel = (term) => rates.find((item) => item.label.includes(term));
-
-    const goldComex = findByLabel("GOLD COMEX");
-    const goldJune = findByLabel("GOLD JUNE") || findByLabel("GOLD JUN");
-    const silverComex = findByLabel("SILVER COMEX");
-    const silverMay = findByLabel("SILVER MAY");
-    const goldGwalior = findByLabel("GOLD 99.50-10 GM") || findByLabel("GOLD JEWAR 22 CT");
-    const silverGwalior =
-      findByLabel("SILVER CUT 9999-1 KG") || findByLabel("SWASTIK SILVER-1 KG");
+    const goldComex = findByLabel(rates, 'goldComex');
+    const goldJune = findByLabel(rates, 'goldJune');
+    const silverComex = findByLabel(rates, 'silverComex');
+    const silverJuly = findByLabel(rates, 'silverJuly');
+    const goldGwalior = findByLabel(rates, 'gold9950') || findByLabel(rates, 'goldJewar22');
+    const silverGwalior = findByLabel(rates, 'silverCut') || findByLabel(rates, 'swastikSilver');
 
     return {
       goldMcx: goldComex ? formatValue(goldComex.sell) : "-",
       goldJuneBuy: goldJune ? formatValue(goldJune.buy) : "-",
       goldGwalior: goldGwalior ? formatValue(goldGwalior.sell) : "-",
       silverMcx: silverComex ? formatValue(silverComex.sell) : "-",
-      silverMayBuy: silverMay ? formatValue(silverMay.buy) : "-",
+      silverJulyBuy: silverJuly ? formatValue(silverJuly.buy) : "-",
       silverGwalior: silverGwalior ? formatValue(silverGwalior.sell) : "-",
     };
   }, [rates]);
@@ -214,11 +206,11 @@ function App() {
     { title: "Gold MCX", value: `$ ${legacyBhav.goldMcx}` },
     { title: "Silver MCX", value: `$ ${legacyBhav.silverMcx}` },
     { title: "Indian Gold", value: `₹ ${legacyBhav.goldJuneBuy}` },
-    { title: "Indian Silver", value: `₹ ${legacyBhav.silverMayBuy}` },
+    { title: "Indian Silver", value: `₹ ${legacyBhav.silverJulyBuy}` },
   ];
 
-  const gwaliorGold = formatOffsetValue(legacyBhav.goldJuneBuy, 1000);
-  const gwaliorSilver = formatOffsetValue(legacyBhav.silverMayBuy, 1000);
+  const gwaliorGold = formatOffsetValue(legacyBhav.goldJuneBuy, 1700);
+  const gwaliorSilver = formatOffsetValue(legacyBhav.silverJulyBuy, 1000);
 
   return (
     <>
@@ -260,6 +252,16 @@ function App() {
                 </p>
               </div>
               {error && <p className="mt-2 text-red-400">Error: {error}</p>}
+              
+              {/* Diagnostics info (optional, for debugging) */}
+              {diagnostics && import.meta.env.DEV && (
+                <div className="mt-3 border-t border-[#5a4a2b] pt-3 text-xs text-[#b39d6f]">
+                  <p>Parsed: {diagnostics.parsedCount} items | Issues: {diagnostics.issueCount}</p>
+                  {diagnostics.warnings.length > 0 && (
+                    <p className="text-yellow-600">⚠ {diagnostics.warnings.length} warning(s)</p>
+                  )}
+                </div>
+              )}
             </div >
 
             <div className="mt-3 rounded-2xl border border-[#4a3d24] bg-[#0d0d0d] p-3">
