@@ -41,6 +41,17 @@ const BRANCHES = [
   },
 ];
 
+const ADMIN_PORTALS = [
+  {
+    label: "Gwalior Admin",
+    href: "https://elixirgold.co.in/elixirgwl/login",
+  },
+  {
+    label: "Etawah Admin",
+    href: "https://elixirgold.co.in/elixiretawah/login.php",
+  },
+];
+
 const formatValue = (value) => {
   if (value === null) {
     return "-";
@@ -230,12 +241,9 @@ function App() {
             <h1 className="mt-2 font-display text-4xl font-semibold leading-tight text-[#f7e6b0] sm:text-5xl">
               ELIXIR GOLD LIVE DESK
             </h1>
-            {/* <p className="mt-3 max-w-3xl text-sm text-[#d6c08a] sm:text-base">
-              Premium black theme dashboard for jewellers with live Buy/Sell/High/Low updates and
-              old Elixir branch details integrated in one modern interface.
-            </p> */}
+            
 
-           
+            
           </div>
 
           
@@ -254,14 +262,14 @@ function App() {
               {error && <p className="mt-2 text-red-400">Error: {error}</p>}
               
               {/* Diagnostics info (optional, for debugging) */}
-              {diagnostics && import.meta.env.DEV && (
+              {/* {diagnostics && import.meta.env.DEV && (
                 <div className="mt-3 border-t border-[#5a4a2b] pt-3 text-xs text-[#b39d6f]">
                   <p>Parsed: {diagnostics.parsedCount} items | Issues: {diagnostics.issueCount}</p>
                   {diagnostics.warnings.length > 0 && (
                     <p className="text-yellow-600">⚠ {diagnostics.warnings.length} warning(s)</p>
                   )}
                 </div>
-              )}
+              )} */}
             </div >
 
             <div className="mt-3 rounded-2xl border border-[#4a3d24] bg-[#0d0d0d] p-3">
@@ -313,6 +321,34 @@ function App() {
           </article>
         ))}
       </section> */}
+
+
+      <section className="mx-auto max-w-7xl px-4 pb-10">
+        <div className="mt-6 rounded-2xl border border-[#43381f] bg-[linear-gradient(180deg,rgba(18,18,18,0.95)_0%,rgba(10,10,10,0.95)_100%)] p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] sm:p-5">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#c8ab6b]">
+                    Quick Access
+                  </p>
+                  <p className="mt-1 text-sm text-[#e1c98f]">Admin login portals for branch staff.</p>
+                </div>
+
+                <div className="flex flex-wrap gap-3">
+                  {ADMIN_PORTALS.map((portal) => (
+                    <a
+                      key={portal.label}
+                      href={portal.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center justify-center rounded-full border border-[#8d7135] bg-[linear-gradient(180deg,#f4dda2_0%,#e8c96d_100%)] px-5 py-2.5 text-sm font-semibold text-[#1b1509] shadow-[0_10px_24px_rgba(0,0,0,0.32)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_28px_rgba(0,0,0,0.38)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#f0d58d] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0b0b]"
+                    >
+                      {portal.label}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            </div>
+      </section>
 
       <section className="mx-auto max-w-7xl px-4 pb-10">
         <div className="overflow-hidden rounded-3xl border border-[#4f4227] bg-[#0a0a0a] shadow-[0_20px_45px_rgba(0,0,0,0.55)]">
