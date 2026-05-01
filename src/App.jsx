@@ -220,7 +220,7 @@ function App() {
     { title: "Indian Silver", value: `₹ ${legacyBhav.silverJulyBuy}` },
   ];
 
-  const gwaliorGold = formatOffsetValue(legacyBhav.goldJuneBuy, 1700);
+  const gwaliorGold = formatOffsetValue(legacyBhav.goldJuneBuy, 1850);
   const gwaliorSilver = formatOffsetValue(legacyBhav.silverJulyBuy, 1000);
 
   return (
@@ -261,15 +261,7 @@ function App() {
               </div>
               {error && <p className="mt-2 text-red-400">Error: {error}</p>}
               
-              {/* Diagnostics info (optional, for debugging) */}
-              {/* {diagnostics && import.meta.env.DEV && (
-                <div className="mt-3 border-t border-[#5a4a2b] pt-3 text-xs text-[#b39d6f]">
-                  <p>Parsed: {diagnostics.parsedCount} items | Issues: {diagnostics.issueCount}</p>
-                  {diagnostics.warnings.length > 0 && (
-                    <p className="text-yellow-600">⚠ {diagnostics.warnings.length} warning(s)</p>
-                  )}
-                </div>
-              )} */}
+            
             </div >
 
             <div className="mt-3 rounded-2xl border border-[#4a3d24] bg-[#0d0d0d] p-3">
@@ -296,31 +288,6 @@ function App() {
          
         </div>
       </header>
-
-      {/* <section className="mx-auto max-w-7xl px-4 pb-4">
-        <div className="overflow-hidden rounded-xl border border-[#41351d] bg-[#0c0c0c] py-2">
-          <div className="whitespace-nowrap px-4 text-sm font-medium text-[#e7c774]">
-            ELIXIR LIVE RATES | GOLD COMEX | SILVER COMEX | INR EXCHANGE | FUTURES | PRODUCTS | JEWAR
-          </div>
-        </div>
-      </section> */}
-
-      {/* <section className="mx-auto grid max-w-7xl gap-4 px-4 pb-6 md:grid-cols-3">
-        {highlightCards.map((card) => (
-          <article
-            key={card.title}
-            className="rounded-2xl border border-[#4d4024] bg-[linear-gradient(130deg,#181818_0%,#0c0c0c_100%)] p-5 shadow-[0_16px_28px_rgba(0,0,0,0.45)]"
-          >
-            <h2 className="font-display text-2xl text-[#f4db99]">{card.title}</h2>
-            <p className="mt-3 text-3xl font-semibold text-[#fff1c8]">
-              {card.row ? `${formatValue(card.row.sell)} ${card.unit}` : "Waiting..."}
-            </p>
-            <p className="mt-2 text-sm text-[#ccb175]">
-              L: {card.row ? formatValue(card.row.low) : "-"} | H: {card.row ? formatValue(card.row.high) : "-"}
-            </p>
-          </article>
-        ))}
-      </section> */}
 
 
       <section className="mx-auto max-w-7xl px-4 pb-10">
