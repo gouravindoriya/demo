@@ -220,7 +220,7 @@ function App() {
     { title: "Indian Silver", value: `₹ ${legacyBhav.silverJulyBuy}` },
   ];
 
-  const gwaliorGold = formatOffsetValue(legacyBhav.goldJuneBuy, 2850);
+  const gwaliorGold = formatOffsetValue(legacyBhav.goldJuneBuy, 1000);
   const gwaliorSilver = formatOffsetValue(legacyBhav.silverJulyBuy, 1000);
 
   return (
